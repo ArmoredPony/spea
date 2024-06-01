@@ -34,3 +34,17 @@ impl<T, F: Fn(T) -> T> Mutator<T> for F {
     self(solution)
   }
 }
+
+/// Responsible for creating offspring solutions by combining existing
+/// solutions.
+pub trait Recombinator<T> {
+  /// Combines genes of existing solutions and returns a generated set of
+  /// solutions.
+  fn combine(&mut self, population: &[T]) -> Vec<T>;
+}
+
+impl<T, F: Fn(&[T]) -> Vec<T>> Recombinator<T> for F {
+  fn combine(&mut self, population: &[T]) -> Vec<T> {
+    self(population)
+  }
+}

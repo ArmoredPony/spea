@@ -1,6 +1,9 @@
-/// Represents a selector used in selection stage.
+use rayon::prelude::*;
+
+/// Responsible for selecting solutions for breeding stage.
 pub trait Selector<T> {
-  /// Selects solutions from given population for the next generation.
+  /// Selects solutions from given population to procreate the next generation
+  /// from.
   fn select(&mut self, population: Vec<T>) -> Vec<T>;
 }
 
@@ -50,13 +53,13 @@ impl<T, F: Fn(&[T]) -> Vec<T>> Breeder<T> for F {
 }
 
 /// Represents an objective that solutions should converge on.
-pub trait Objective<T, G> {
+pub trait Objective<T> {
   /// Tests how close is current solution to the goal.
-  fn test(&mut self, solution: &T) -> G;
+  fn test(&self, solution: &T) -> f32;
 }
 
-impl<T, G, F: Fn(&T) -> G> Objective<T, G> for F {
-  fn test(&mut self, solution: &T) -> G {
+impl<T, F: Fn(&T) -> f32> Objective<T> for F {
+  fn test(&self, solution: &T) -> f32 {
     self(solution)
   }
 }

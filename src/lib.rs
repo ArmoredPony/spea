@@ -13,11 +13,11 @@ impl<T, F: Fn(Vec<T>) -> Vec<T>> Selector<T> for F {
 /// Responsible for stopping genetic algorithm loop.
 pub trait Terminator<T> {
   /// Returns `true` if termination condition is met.
-  fn terminate(&mut self, population: Vec<T>) -> bool;
+  fn terminate(&mut self, population: &[T]) -> bool;
 }
 
-impl<T, F: Fn(Vec<T>) -> bool> Terminator<T> for F {
-  fn terminate(&mut self, population: Vec<T>) -> bool {
+impl<T, F: Fn(&[T]) -> bool> Terminator<T> for F {
+  fn terminate(&mut self, population: &[T]) -> bool {
     self(population)
   }
 }

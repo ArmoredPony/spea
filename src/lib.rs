@@ -48,3 +48,15 @@ impl<T, F: Fn(&[T]) -> Vec<T>> Recombinator<T> for F {
     self(population)
   }
 }
+
+/// Represents an objective that solutions should converge on.
+pub trait Objective<T, G> {
+  /// Tests how close is current solution to the goal.
+  fn test(&mut self, solution: &T) -> G;
+}
+
+impl<T, G, F: Fn(&T) -> G> Objective<T, G> for F {
+  fn test(&mut self, solution: &T) -> G {
+    self(solution)
+  }
+}

@@ -1,5 +1,3 @@
-use rayon::prelude::*;
-
 /// Responsible for selecting solutions for breeding stage.
 pub trait Selector<T> {
   /// Selects solutions from given population to procreate the next generation
@@ -62,4 +60,16 @@ impl<T, F: Fn(&T) -> f32> Objective<T> for F {
   fn test(&self, solution: &T) -> f32 {
     self(solution)
   }
+}
+
+pub struct Spea2<T> {
+  population: Vec<T>,
+  archive: Vec<T>,
+}
+
+impl<T> Spea2<T>
+where
+  T: Sync + Send,
+{
+  pub fn step(&mut self) {}
 }

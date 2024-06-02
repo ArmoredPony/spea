@@ -18,10 +18,10 @@ trait ParetoDominance {
   fn dominance_ord(&self, other: &Self) -> Ordering;
 }
 
-impl<const N: usize> ParetoDominance for [f32; N] {
+impl ParetoDominance for &[f32] {
   fn dominance_ord(&self, other: &Self) -> Ordering {
     let mut ord = Ordering::Equal;
-    for (s, o) in self.iter().zip(other) {
+    for (s, o) in self.iter().zip(other.iter()) {
       let ord_i = s.partial_cmp(o).expect("attempted to compare a NaN");
       match (ord_i, ord) {
         (Ordering::Greater, Ordering::Less)

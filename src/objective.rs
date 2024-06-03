@@ -22,6 +22,14 @@ pub(super) trait ParetoDominance {
   /// - `Greater` if `other` dominates `self`
   /// - `Equal` otherwise
   fn pareto_dominance_ord(&self, other: &Self) -> Ordering;
+
+  /// Returns `true` if `self` dominates `other`.
+  fn pareto_dominates(&self, other: &Self) -> bool {
+    match self.pareto_dominance_ord(other) {
+      Ordering::Less => true,
+      _ => false,
+    }
+  }
 }
 
 impl ParetoDominance for &[f32] {

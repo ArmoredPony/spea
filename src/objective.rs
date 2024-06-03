@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 /// Represents an objective that solutions should converge on.
 pub trait Objective<S> {
   /// Tests how close is current solution to the goal.
-  /// The target score of an objective is `0.0`.
+  /// The target score of an objective is 0.
+  /// Score can be negative, only its distance to 0 matters.
   fn test(&self, solution: &S) -> f32;
 }
 
@@ -27,7 +28,10 @@ impl ParetoDominance for &[f32] {
   fn pareto_dominance_ord(&self, other: &Self) -> Ordering {
     let mut ord = Ordering::Equal;
     for (s, o) in self.iter().zip(other.iter()) {
-      let ord_i = s.partial_cmp(o).expect("attempted to compare a NaN");
+      let ord_i = s
+        .abs()
+        .partial_cmp(&o.abs())
+        .expect("attempted to compare a NaN");
       match (ord_i, ord) {
         (Ordering::Greater, Ordering::Less)
         | (Ordering::Less, Ordering::Greater) => return Ordering::Equal,

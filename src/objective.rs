@@ -1,25 +1,30 @@
 use std::cmp::Ordering;
 
 /// Represents an objective that solutions should converge on.
-pub trait Objective<T> {
+pub trait Objective<S> {
   /// Tests how close is current solution to the goal.
-  fn test(&self, solution: &T) -> f32;
+  /// The target score of an objective is `0.0`.
+  fn test(&self, solution: &S) -> f32;
 }
 
-impl<T, F: Fn(&T) -> f32> Objective<T> for F {
-  fn test(&self, solution: &T) -> f32 {
+impl<S, F: Fn(&S) -> f32> Objective<S> for F {
+  fn test(&self, solution: &S) -> f32 {
     self(solution)
   }
 }
 
-struct Objectives<T, const N: usize>([Box<dyn Objective<T>>; N]);
+pub(super) struct Objectives<S>(pub Vec<Box<dyn Objective<S> + Send + Sync>>);
 
-trait ParetoDominance {
-  fn dominance_ord(&self, other: &Self) -> Ordering;
+pub(super) trait ParetoDominance {
+  /// Calculates pareto dominance ordering. Returns
+  /// - `Less` if `self` dominates `other`
+  /// - `Greater` if `other` dominates `self`
+  /// - `Equal` otherwise
+  fn pareto_dominance_ord(&self, other: &Self) -> Ordering;
 }
 
 impl ParetoDominance for &[f32] {
-  fn dominance_ord(&self, other: &Self) -> Ordering {
+  fn pareto_dominance_ord(&self, other: &Self) -> Ordering {
     let mut ord = Ordering::Equal;
     for (s, o) in self.iter().zip(other.iter()) {
       let ord_i = s.partial_cmp(o).expect("attempted to compare a NaN");

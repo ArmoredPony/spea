@@ -29,10 +29,13 @@ pub(super) trait ParetoDominance {
   }
 }
 
-impl ParetoDominance for &[f32] {
+impl<T> ParetoDominance for T
+where
+  T: AsRef<[f32]>,
+{
   fn pareto_dominance_ord(&self, other: &Self) -> Ordering {
     let mut ord = Ordering::Equal;
-    for (s, o) in self.iter().zip(other.iter()) {
+    for (s, o) in self.as_ref().iter().zip(other.as_ref().iter()) {
       let ord_i = s
         .abs()
         .partial_cmp(&o.abs())

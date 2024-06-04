@@ -42,10 +42,8 @@ where
   /// returns `None`.
   pub fn run_once(&mut self) -> Option<Vec<S>> {
     // gather all solutions in a vector
-    let all_solutions: Vec<S> = std::mem::take(&mut self.population)
-      .into_iter()
-      .chain(std::mem::take(&mut self.archive))
-      .collect();
+    let mut all_solutions = std::mem::take(&mut self.population);
+    all_solutions.append(&mut std::mem::take(&mut self.archive));
 
     // calculate fitness values per solution
     let raw_fitness = self.raw_fitness_values(&all_solutions);

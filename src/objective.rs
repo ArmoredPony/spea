@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 /// Represents an objective that solutions should converge on.
 pub trait Objective<S> {
   /// Tests how close is current solution to the goal.
@@ -11,42 +9,5 @@ pub trait Objective<S> {
 impl<S, F: Fn(&S) -> f32> Objective<S> for F {
   fn test(&self, solution: &S) -> f32 {
     self(solution)
-  }
-}
-
-pub(super) struct Objectives<S>(pub Vec<Box<dyn Objective<S> + Send + Sync>>);
-
-pub(super) trait ParetoDominance {
-  /// Calculates pareto dominance ordering. Returns
-  /// - `Less` if `self` dominates `other`
-  /// - `Greater` if `other` dominates `self`
-  /// - `Equal` otherwise
-  fn pareto_dominance_ord(&self, other: &Self) -> Ordering;
-
-  /// Returns `true` if `self` dominates `other`.
-  fn pareto_dominates(&self, other: &Self) -> bool {
-    matches!(self.pareto_dominance_ord(other), Ordering::Less)
-  }
-}
-
-impl<T> ParetoDominance for T
-where
-  T: AsRef<[f32]>,
-{
-  fn pareto_dominance_ord(&self, other: &Self) -> Ordering {
-    let mut ord = Ordering::Equal;
-    for (s, o) in self.as_ref().iter().zip(other.as_ref().iter()) {
-      let ord_i = s
-        .abs()
-        .partial_cmp(&o.abs())
-        .expect("attempted to compare a NaN");
-      match (ord_i, ord) {
-        (Ordering::Greater, Ordering::Less)
-        | (Ordering::Less, Ordering::Greater) => return Ordering::Equal,
-        (_, Ordering::Equal) => ord = ord_i,
-        _ => (),
-      }
-    }
-    ord
   }
 }

@@ -1,7 +1,8 @@
+use std::cmp::Ordering;
+
 use breeder::Breeder;
-use itertools::Itertools;
 use mutator::Mutator;
-use objective::{Objective, Objectives, ParetoDominance};
+use objective::Objective;
 use rayon::prelude::*;
 use selector::Selector;
 use terminator::Terminator;
@@ -11,6 +12,43 @@ pub mod mutator;
 pub mod objective;
 pub mod selector;
 pub mod terminator;
+
+struct Objectives<S>(pub Vec<Box<dyn Objective<S> + Send + Sync>>);
+
+trait ParetoDominance {
+  /// Calculates pareto dominance ordering. Returns
+  /// - `Less` if `self` dominates `other`
+  /// - `Greater` if `other` dominates `self`
+  /// - `Equal` otherwise
+  fn pareto_dominance_ord(&self, other: &Self) -> Ordering;
+
+  /// Returns `true` if `self` dominates `other`.
+  fn pareto_dominates(&self, other: &Self) -> bool {
+    matches!(self.pareto_dominance_ord(other), Ordering::Less)
+  }
+}
+
+impl<T> ParetoDominance for T
+where
+  T: AsRef<[f32]>,
+{
+  fn pareto_dominance_ord(&self, other: &Self) -> Ordering {
+    let mut ord = Ordering::Equal;
+    for (s, o) in self.as_ref().iter().zip(other.as_ref().iter()) {
+      let ord_i = s
+        .abs()
+        .partial_cmp(&o.abs())
+        .expect("attempted to compare a NaN");
+      match (ord_i, ord) {
+        (Ordering::Greater, Ordering::Less)
+        | (Ordering::Less, Ordering::Greater) => return Ordering::Equal,
+        (_, Ordering::Equal) => ord = ord_i,
+        _ => (),
+      }
+    }
+    ord
+  }
+}
 
 pub struct Spea2<S, T, L, B, M>
 where
@@ -61,8 +99,9 @@ where
       a.1.partial_cmp(&b.1).expect("attempted to compare a NaN")
     });
 
-    // count nondominated solutions.
-    // a solution is nondominated if its fitness score < 1
+    // count first nondominated solutions. counts all such solution since they
+    // are sorted by dominance. a solution is nondominated if its fitness score
+    // is < 1
     let nondom_cnt = sorted_solutions_fitness
       .iter()
       .position(|t| t.1 >= 1.0)
@@ -131,7 +170,7 @@ where
     let strength_values = solutions_obj_fitness.iter().map(|f_i| {
       solutions_obj_fitness
         .iter()
-        .filter(|f_j| f_i.as_slice().pareto_dominates(&f_j.as_slice()))
+        .filter(|f_j| f_i.pareto_dominates(f_j))
         .count()
     });
     todo!()

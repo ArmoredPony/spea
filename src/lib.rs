@@ -13,7 +13,7 @@ pub mod objective;
 pub mod selector;
 pub mod terminator;
 
-pub struct Spea2<U, T, S, B, M>
+pub struct Spea2<'a, U, T, S, B, M>
 where
   T: Terminator<U>,
   S: Selector<U>,
@@ -27,10 +27,10 @@ where
   selector: S,
   breeder: B,
   mutator: M,
-  objectives: Objectives<U>,
+  objectives: Objectives<'a, U>,
 }
 
-impl<U, T, S, B, M> Spea2<U, T, S, B, M>
+impl<'a, U, T, S, B, M> Spea2<'a, U, T, S, B, M>
 where
   T: Terminator<U>,
   S: Selector<U>,
@@ -143,7 +143,7 @@ where
     );
 
     let mut res = vec![Vec::with_capacity(obj_results.len() - 1); nondom_count];
-    // TODO: try to parallelize this stuff
+    // TODO: try to parallelize this
     for (i, a) in obj_results[..nondom_count].iter().enumerate() {
       for (j, b) in obj_results[i + 1..].iter().enumerate() {
         let d = a.distance(b);
@@ -208,7 +208,22 @@ where
   }
 }
 
-struct Objectives<S>(pub Vec<Box<dyn Objective<S> + Send + Sync>>);
+/// Containes boxed `Objective`s.
+struct Objectives<'a, U>(pub Vec<Box<dyn Objective<U> + Send + Sync + 'a>>);
+
+impl<'a, T, U, const N: usize> From<[T; N]> for Objectives<'a, U>
+where
+  T: Objective<U> + Send + Sync + 'a,
+{
+  fn from(value: [T; N]) -> Self {
+    Objectives(
+      value
+        .into_iter()
+        .map(|v| Box::new(v) as Box<dyn Objective<U> + Send + Sync>)
+        .collect::<Vec<_>>(),
+    )
+  }
+}
 
 /// Represents objective results values.
 struct ObjResults(Vec<f32>);

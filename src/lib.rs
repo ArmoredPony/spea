@@ -13,36 +13,35 @@ pub mod objective;
 pub mod selector;
 pub mod terminator;
 
-pub struct Spea2<S, T, L, B, M>
+pub struct Spea2<U, T, S, B, M>
 where
-  T: Terminator<S>,
-  L: Selector<S>,
-  B: Breeder<S>,
-  M: Mutator<S>,
+  T: Terminator<U>,
+  S: Selector<U>,
+  B: Breeder<U>,
+  M: Mutator<U>,
 {
-  population: Vec<S>,
-  archive: Vec<S>,
+  population: Vec<U>,
+  archive: Vec<U>,
   archive_size: usize,
   terminator: T,
-  selector: L,
+  selector: S,
   breeder: B,
   mutator: M,
-  objectives: Objectives<S>,
+  objectives: Objectives<U>,
 }
 
-impl<S, T, L, B, M> Spea2<S, T, L, B, M>
+impl<U, T, S, B, M> Spea2<U, T, S, B, M>
 where
-  S:,
-  T: Terminator<S>,
-  L: Selector<S>,
-  B: Breeder<S>,
-  M: Mutator<S>,
+  T: Terminator<U>,
+  S: Selector<U>,
+  B: Breeder<U>,
+  M: Mutator<U>,
 {
   /// Runs the algorithm until termination condition is met. Returns a
   /// non-dominated (might contain dominated sometimes) set of solutions.
   /// Returned solutions are moved out from `Spea2` struct which makes it
   /// unusable, that's why `run` consumes `self`.
-  pub fn run(mut self) -> Vec<S> {
+  pub fn run(mut self) -> Vec<U> {
     loop {
       if let Some(solutions) = self.run_once() {
         return solutions;
@@ -53,7 +52,7 @@ where
   /// Performs a single algorithm iteration. If termination condition was met on
   /// this iteration, returns a nondominated set of solutions. Otherwise,
   /// returns `None`.
-  fn run_once(&mut self) -> Option<Vec<S>> {
+  fn run_once(&mut self) -> Option<Vec<U>> {
     // gather all solutions in a vector
     let mut all_solutions = std::mem::take(&mut self.population);
     all_solutions.append(&mut std::mem::take(&mut self.archive));
@@ -63,8 +62,8 @@ where
 
     let k = (all_solutions.len() as f32).sqrt() as usize;
 
-    // TODO: get rid of this tuple nonsense.
-    // maybe use consecutive sortinginstead
+    // instead of packing solutions and their fitness scores together
+    // maybe use consecutive sorting here instead
     let solutions_fitness = all_solutions
       .into_iter()
       .enumerate()
@@ -102,7 +101,7 @@ where
   }
 
   /// Calculates objective values for given solutions.
-  fn objective_values(&self, solutions: &[S]) -> Vec<ObjResults> {
+  fn objective_values(&self, solutions: &[U]) -> Vec<ObjResults> {
     // TODO: test `par` efficiency
     solutions
       .iter()
@@ -139,7 +138,7 @@ where
   ) -> Vec<f32> {
     debug_assert!(k < obj_results.len(), "`k` is out of bounds!");
     debug_assert!(
-      nondom_count < obj_results.len(),
+      nondom_count <= obj_results.len(),
       "`nondom_count` is out of bounds!"
     );
 
@@ -175,10 +174,10 @@ where
   /// Returns a new archive.
   fn do_enviromental_selection(
     &self,
-    mut solutions_fitness: Vec<(S, f32)>, // solution-fitness pairs
+    mut solutions_fitness: Vec<(U, f32)>, // solution-fitness pairs
     obj_results: &[ObjResults],
     k: usize,
-  ) -> Vec<S> {
+  ) -> Vec<U> {
     // sort solutions by their fitness. nondominated solutions end up
     // in the beginning of the vector
     // TODO: test `par` efficiency

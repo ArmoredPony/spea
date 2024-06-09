@@ -37,6 +37,45 @@ where
   B: Breeder<U>,
   M: Mutator<U>,
 {
+  /// Creates and returns a new `Spea2` struct, performing necessary checks
+  /// on creation.
+  ///
+  /// # Panics
+  ///
+  /// This function panics if the initial `population` is empty or
+  /// `archive_size` is bigger than `population` size or smaller than 0.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// todo!()
+  /// ```
+  pub fn new(
+    population: Vec<U>,
+    archive_size: usize,
+    terminator: T,
+    selector: S,
+    breeder: B,
+    mutator: M,
+    objectives: Objectives<'a, U>,
+  ) -> Self {
+    assert!(!population.is_empty(), "initial population cannot be empty");
+    assert!(
+      archive_size > 0 && archive_size <= population.len(),
+      "archive size cannot be bigger than initial population size or 0"
+    );
+    Self {
+      population,
+      archive_size,
+      terminator,
+      selector,
+      breeder,
+      mutator,
+      objectives,
+      archive: Vec::new(),
+    }
+  }
+
   /// Runs the algorithm until termination condition is met. Returns a
   /// non-dominated (might contain dominated sometimes) set of solutions.
   /// Returned solutions are moved out from `Spea2` struct which makes it
@@ -194,6 +233,7 @@ where
         .zip(Self::distances_to_kth_neighbor(obj_results, nondom_cnt, k))
         .for_each(|((_, f), d)| *f = d);
       // solutions with smaller distance will be in the end of the vector
+      // TODO: test `par` efficiency
       solutions_fitness.sort_by(|a, b| b.1.total_cmp(&a.1));
     }
 
@@ -201,6 +241,7 @@ where
     // if there was too few, takes those with bigger distance to k-th neighbor
     solutions_fitness.truncate(self.archive_size);
     debug_assert_eq!(solutions_fitness.len(), self.archive_size);
+    // TODO: test `par` efficiency
     solutions_fitness
       .into_iter()
       .map(|t| t.0)
@@ -209,7 +250,7 @@ where
 }
 
 /// Containes boxed `Objective`s.
-struct Objectives<'a, U>(pub Vec<Box<dyn Objective<U> + Send + Sync + 'a>>);
+pub struct Objectives<'a, U>(pub Vec<Box<dyn Objective<U> + Send + Sync + 'a>>);
 
 impl<'a, T, U, const N: usize> From<[T; N]> for Objectives<'a, U>
 where

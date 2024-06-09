@@ -115,18 +115,18 @@ where
   /// Raw fitness is determined by the strengths of its dominators in archive
   /// and population.
   fn raw_fitness_values(obj_results: &[ObjResults]) -> Vec<f32> {
-    // TODO: reimplement with `pareto_dominance_ord`, should be more efficient
-    let strength_values = obj_results
-      .iter()
-      .map(|f_i| {
-        obj_results
-          .iter()
-          .filter(|f_j| !std::ptr::eq(f_i, *f_j) && f_i.pareto_dominates(f_j))
-          .count() as f32
-      })
-      .collect::<Vec<_>>();
-    // TODO: make it return raw fitness vales
-    todo!()
+    let mut res = vec![0.0; obj_results.len()];
+    // TODO: try to parallelize this
+    for (i, a) in obj_results[..obj_results.len() - 1].iter().enumerate() {
+      for (j, b) in obj_results[i + 1..].iter().enumerate() {
+        match a.pareto_dominance_ord(b) {
+          Ordering::Less => res[j] += 1.0,
+          Ordering::Greater => res[i] += 1.0,
+          Ordering::Equal => (),
+        };
+      }
+    }
+    res
   }
 
   /// Calculates distances from `nondom_count` number of vectors to its k-th

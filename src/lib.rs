@@ -125,8 +125,10 @@ where
     }
 
     // select, breed and mutate solutions
-    let selected_solutions = self.selector.select(&new_archive);
-    let mut new_solutions = self.breeder.breed(selected_solutions);
+    let selected_solutions = self
+      .selector
+      .select(&new_archive.iter().collect::<Vec<_>>());
+    let mut new_solutions = self.breeder.breed(&selected_solutions);
     // TODO: test `par` efficiency
     new_solutions
       .iter_mut()

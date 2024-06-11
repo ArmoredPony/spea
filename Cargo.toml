@@ -6,3 +6,10 @@ edition = "2021"
 [dependencies]
 itertools = "0.13.0"
 rayon = "1.10.0"
+
+[[example]]
+name = "binh-korn"
+path = "examples/binh-korn.rs"
+
+[dev-dependencies]
+rand = "0.8.5"

@@ -40,6 +40,9 @@ where
   /// Creates and returns a new `Spea2` struct, performing necessary checks
   /// on creation.
   ///
+  /// `archive_size` cannot be bigger than initial population size. This is to
+  /// ensure that archive is always full.
+  ///
   /// # Panics
   ///
   /// This function panics if the initial `population` is empty or
@@ -96,13 +99,14 @@ where
     let mut all_solutions = std::mem::take(&mut self.population);
     all_solutions.append(&mut std::mem::take(&mut self.archive));
 
-    let objective_results = self.objective_values(&all_solutions);
-    let raw_fitness = Self::raw_fitness_values(&objective_results);
+    let objective_scores = self.objective_values(&all_solutions);
+    let raw_fitness = Self::raw_fitness_values(&objective_scores);
 
     let k = (all_solutions.len() as f32).sqrt() as usize;
 
     // instead of packing solutions and their fitness scores together
     // maybe use consecutive sorting here instead
+    // TODO: test `par` efficiency
     let solutions_fitness = all_solutions
       .into_iter()
       .enumerate()
@@ -113,21 +117,30 @@ where
     // - if there are too many solutions, truncate `nondominated` vector
     // - if there are too few solutions, fill up the archive with dominated ones
     // - otherwise just move nondominated solutions into new archive
-    let new_archive = self.do_enviromental_selection(
+    let selected_solutions_fitness = self.do_enviromental_selection(
       solutions_fitness, //
-      &objective_results,
+      &objective_scores,
       k,
     );
 
     // check termination condition. if it's met, return best solutions
-    if self.terminator.terminate(&new_archive) {
-      return Some(new_archive);
+    if self.terminator.terminate(&selected_solutions_fitness) {
+      return Some(
+        // TODO: test `par` efficiency
+        selected_solutions_fitness
+          .into_iter()
+          .map(|(s, _)| s)
+          .collect(),
+      );
     }
 
     // select, breed and mutate solutions
-    let selected_solutions = self
-      .selector
-      .select(&new_archive.iter().collect::<Vec<_>>());
+    // TODO: test `par` efficiency
+    let solutions_refs_fitness = selected_solutions_fitness
+      .iter()
+      .map(|(s, f)| (s, *f))
+      .collect::<Vec<_>>();
+    let selected_solutions = self.selector.select(&solutions_refs_fitness);
     let mut new_solutions = self.breeder.breed(&selected_solutions);
     // TODO: test `par` efficiency
     new_solutions
@@ -136,30 +149,32 @@ where
 
     // set new solutions set as current population, update archive
     self.population = new_solutions;
-    self.archive = new_archive;
+    // TODO: test `par` efficiency
+    self.archive = selected_solutions_fitness
+      .into_iter()
+      .map(|(s, _)| s)
+      .collect();
 
     None
   }
 
   /// Calculates objective values for given solutions.
-  fn objective_values(&self, solutions: &[U]) -> Vec<ObjResults> {
+  fn objective_values(&self, solutions: &[U]) -> Vec<ObjScores> {
     // TODO: test `par` efficiency
     solutions
       .iter()
-      .map(|s| {
-        ObjResults(self.objectives.0.iter().map(|o| o.test(s)).collect())
-      })
+      .map(|s| ObjScores(self.objectives.0.iter().map(|o| o.test(s)).collect()))
       .collect()
   }
 
   /// Calculates raw fitness values for each solution.
   /// Raw fitness is determined by the strengths of its dominators in archive
   /// and population.
-  fn raw_fitness_values(obj_results: &[ObjResults]) -> Vec<f32> {
-    let mut res = vec![0.0; obj_results.len()];
+  fn raw_fitness_values(obj_scores: &[ObjScores]) -> Vec<f32> {
+    let mut res = vec![0.0; obj_scores.len()];
     // TODO: try to parallelize this
-    for (i, a) in obj_results[..obj_results.len() - 1].iter().enumerate() {
-      for (j, b) in obj_results[i + 1..].iter().enumerate() {
+    for (i, a) in obj_scores[..obj_scores.len() - 1].iter().enumerate() {
+      for (j, b) in obj_scores[i + 1..].iter().enumerate() {
         match a.pareto_dominance_ord(b) {
           Ordering::Less => res[j] += 1.0,
           Ordering::Greater => res[i] += 1.0,
@@ -173,20 +188,20 @@ where
   /// Calculates distances from `nondom_count` number of vectors to its k-th
   /// neighbor.
   fn distances_to_kth_neighbor(
-    obj_results: &[ObjResults],
+    obj_scores: &[ObjScores],
     nondom_count: usize,
     k: usize,
   ) -> Vec<f32> {
-    debug_assert!(k < obj_results.len(), "`k` is out of bounds!");
+    debug_assert!(k < obj_scores.len(), "`k` is out of bounds!");
     debug_assert!(
-      nondom_count <= obj_results.len(),
+      nondom_count <= obj_scores.len(),
       "`nondom_count` is out of bounds!"
     );
 
-    let mut res = vec![Vec::with_capacity(obj_results.len() - 1); nondom_count];
+    let mut res = vec![Vec::with_capacity(obj_scores.len() - 1); nondom_count];
     // TODO: try to parallelize this
-    for (i, a) in obj_results[..nondom_count].iter().enumerate() {
-      for (j, b) in obj_results[i + 1..].iter().enumerate() {
+    for (i, a) in obj_scores[..nondom_count].iter().enumerate() {
+      for (j, b) in obj_scores[i + 1..].iter().enumerate() {
         let d = a.distance(b);
         res[i].push(d);
         if j < nondom_count {
@@ -216,9 +231,9 @@ where
   fn do_enviromental_selection(
     &self,
     mut solutions_fitness: Vec<(U, f32)>, // solution-fitness pairs
-    obj_results: &[ObjResults],
+    obj_scores: &[ObjScores],
     k: usize,
-  ) -> Vec<U> {
+  ) -> Vec<(U, f32)> {
     // sort solutions by their fitness. nondominated solutions end up
     // in the beginning of the vector
     // TODO: test `par` efficiency
@@ -227,27 +242,24 @@ where
     // count first nondominated solutions. counts all such solutions since they
     // are sorted by dominance. a solution is nondominated if its fitness score
     // is < 1
-    let nondom_cnt = solutions_fitness.partition_point(|t| t.1 < 1.0);
+    let nondom_cnt = solutions_fitness.partition_point(|(_, f)| *f < 1.0);
     if nondom_cnt > self.archive_size {
       // all solutions are non-dominated and their raw strengths are 0
       solutions_fitness
         .iter_mut()
-        .zip(Self::distances_to_kth_neighbor(obj_results, nondom_cnt, k))
-        .for_each(|((_, f), d)| *f = d);
+        .zip(Self::distances_to_kth_neighbor(obj_scores, nondom_cnt, k))
+        .for_each(|((_, f), d)| *f += d);
       // solutions with smaller distance will be in the end of the vector
       // TODO: test `par` efficiency
-      solutions_fitness.sort_by(|a, b| b.1.total_cmp(&a.1));
+      solutions_fitness.truncate(nondom_cnt);
+      solutions_fitness.sort_by(|a, b| b.1.trunc().total_cmp(&a.1.trunc()));
     }
 
     // if there was too many solutions, takes those with smaller raw strength
     // if there was too few, takes those with bigger distance to k-th neighbor
     solutions_fitness.truncate(self.archive_size);
     debug_assert_eq!(solutions_fitness.len(), self.archive_size);
-    // TODO: test `par` efficiency
     solutions_fitness
-      .into_iter()
-      .map(|t| t.0)
-      .collect::<Vec<_>>()
   }
 }
 
@@ -268,10 +280,10 @@ where
   }
 }
 
-/// Represents objective results values.
-struct ObjResults(Vec<f32>);
+/// Represents objective scores values.
+struct ObjScores(Vec<f32>);
 
-impl ObjResults {
+impl ObjScores {
   /// Calculates pareto dominance ordering. Returns
   /// - `Less` if `self` dominates `other`
   /// - `Greater` if `other` dominates `self`
@@ -297,7 +309,7 @@ impl ObjResults {
     matches!(self.pareto_dominance_ord(other), Ordering::Less)
   }
 
-  /// Calculates squared euclidean distance between results' vectors.
+  /// Calculates squared euclidean distance between scores' vectors.
   fn distance(&self, other: &Self) -> f32 {
     self
       .0

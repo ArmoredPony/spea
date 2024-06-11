@@ -24,6 +24,7 @@ impl Generations {
 
 impl<T> Terminator<T> for Generations {
   fn terminate(&mut self, _: &[(T, f32)]) -> bool {
+    println!("generations: {}", self.generations);
     match self.generations {
       0 => true,
       _ => {

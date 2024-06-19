@@ -4,11 +4,11 @@ pub trait Selector<T> {
   /// from. Solutions are passed in tuple with their calculated fitness values.
   /// Fitness values are calculated according to the SPEA2 algorithm. The
   /// smaller the better.
-  fn select<'a>(&mut self, population: &'a [(&'a T, f32)]) -> Vec<&'a T>;
+  fn select<'a>(&mut self, population: &'a [&'a T]) -> Vec<&'a T>;
 }
 
-impl<T, F: for<'a> Fn(&'a [(&'a T, f32)]) -> Vec<&'a T>> Selector<T> for F {
-  fn select<'a>(&mut self, population: &'a [(&'a T, f32)]) -> Vec<&'a T> {
+impl<T, F: for<'a> Fn(&'a [&'a T]) -> Vec<&'a T>> Selector<T> for F {
+  fn select<'a>(&mut self, population: &'a [&'a T]) -> Vec<&'a T> {
     self(population)
   }
 }

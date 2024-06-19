@@ -13,6 +13,7 @@ pub mod objective;
 pub mod selector;
 pub mod terminator;
 
+// TODO: write docs
 pub struct Spea2<'a, U, T, S, C, M>
 where
   T: Terminator<U>,
@@ -101,8 +102,8 @@ where
     solutions.iter_mut().for_each(|s| {
       s.scores = ObjScores(self.objectives.test_each(&s.solution))
     });
-    Self::assign_raw_fitness(&mut solutions);
     solutions.append(&mut self.archive);
+    Self::assign_raw_fitness(&mut solutions);
 
     self.perform_enrironmental_selection(&mut solutions);
     debug_assert_eq!(solutions.len(), self.archive_size);
@@ -170,22 +171,36 @@ where
   fn assign_raw_fitness(solutions: &mut [SolutionData<U>]) {
     // TODO: parallelize
     let mut strength_vals = vec![0.0; solutions.len()];
-    for (i, a) in solutions[..solutions.len() - 1].iter().enumerate() {
-      for (j, b) in solutions[i + 1..].iter().enumerate() {
-        match a.scores.pareto_dominance_ord(&b.scores) {
-          Ordering::Less => strength_vals[i] += 1.0,
-          Ordering::Greater => strength_vals[i + j + 1] += 1.0,
-          Ordering::Equal => (),
+    // for (i, a) in solutions[..solutions.len() - 1].iter().enumerate() {
+    //   for (j, b) in solutions[i + 1..].iter().enumerate() {
+    //     match a.scores.pareto_dominance_ord(&b.scores) {
+    //       Ordering::Less => strength_vals[i] += 1.0,
+    //       Ordering::Greater => strength_vals[i + j + 1] += 1.0,
+    //       Ordering::Equal => (),
+    //     }
+    //   }
+    // }
+    for (a, s) in solutions.iter().zip(strength_vals.iter_mut()) {
+      for b in solutions.iter() {
+        if a.scores.pareto_dominance_ord(&b.scores) == Ordering::Less {
+          *s += 1.0;
         }
       }
     }
     let mut raw_fitness_vals = vec![0.0; solutions.len()];
-    for (i, a) in solutions[..solutions.len() - 1].iter().enumerate() {
-      for (j, b) in solutions[i + 1..].iter().enumerate() {
-        match a.scores.pareto_dominance_ord(&b.scores) {
-          Ordering::Less => raw_fitness_vals[i + j + 1] += strength_vals[i],
-          Ordering::Greater => raw_fitness_vals[i] += strength_vals[i + j + 1],
-          Ordering::Equal => (),
+    // for (i, a) in solutions[..solutions.len() - 1].iter().enumerate() {
+    //   for (j, b) in solutions[i + 1..].iter().enumerate() {
+    //     match a.scores.pareto_dominance_ord(&b.scores) {
+    //       Ordering::Less => raw_fitness_vals[i + j + 1] += strength_vals[i],
+    //       Ordering::Greater => raw_fitness_vals[i] += strength_vals[i + j + 1],
+    //       Ordering::Equal => (),
+    //     }
+    //   }
+    // }
+    for (a, s) in solutions.iter().zip(strength_vals.iter()) {
+      for (b, r) in solutions.iter().zip(raw_fitness_vals.iter_mut()) {
+        if a.scores.pareto_dominance_ord(&b.scores) == Ordering::Less {
+          *r += *s;
         }
       }
     }

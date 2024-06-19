@@ -80,19 +80,16 @@ where
     }
   }
 
-  /// Runs the algorithm until termination condition is met. Returns a
-  /// non-dominated (might contain dominated sometimes) set of solutions.
-  /// Returned solutions are moved out from `Spea2` struct which makes it
-  /// unusable, that's why `run` consumes `self`.
+  /// Runs the algorithm until termination condition is met. If termination
+  /// condition was already met and `finished` flag is set, does nothing.
   pub fn run(&mut self) {
     while !self.finished {
       self.run_once()
     }
   }
 
-  /// Performs a single algorithm iteration. If termination condition was met on
-  /// this iteration, returns a nondominated set of solutions. Otherwise,
-  /// returns `None`.
+  /// Performs a single algorithm iteration. If termination condition was met
+  /// and `finished` flag is set, does nothing.
   pub fn run_once(&mut self) {
     if self.finished {
       return;
@@ -118,6 +115,7 @@ where
 
     let mut new_solutions = self.crossover.recombine(&selected_solutions);
 
+    // TODO: parallelize
     new_solutions
       .iter_mut()
       .for_each(|s| self.mutator.mutate(s));
@@ -143,8 +141,8 @@ where
   /// Moves out all found nondominated solutions **from the archive**.
   pub fn get_nondominated_solutions(self) -> Vec<U> {
     let mut solutions = self.archive;
-    solutions.sort_by(|a, b| a.raw_fitness.total_cmp(&b.raw_fitness));
-    let nondom_cnt = solutions.partition_point(|s| s.raw_fitness < 1.0);
+    solutions.sort_by(|a, b| a.fitness.total_cmp(&b.fitness));
+    let nondom_cnt = solutions.partition_point(|s| s.fitness < 1.0);
     solutions.truncate(nondom_cnt);
     solutions.into_iter().map(|s| s.solution).collect()
   }
@@ -161,7 +159,7 @@ where
 
   /// Returns a slice of all nondominated solutions **from the archive**.
   pub fn peek_nondominated_solutions(&self) -> Vec<&U> {
-    self.archive[..self.archive.partition_point(|s| s.raw_fitness < 1.0)]
+    self.archive[..self.archive.partition_point(|s| s.fitness < 1.0)]
       .iter()
       .map(|s| &s.solution)
       .collect()
@@ -205,7 +203,7 @@ where
       }
     }
     for (s, r) in solutions.iter_mut().zip(raw_fitness_vals) {
-      s.raw_fitness = r;
+      s.fitness = r;
     }
   }
 
@@ -218,20 +216,23 @@ where
     solutions: &mut Vec<SolutionData<U>>,
   ) {
     // TODO: parallelize
-    solutions.sort_unstable_by(|a, b| a.raw_fitness.total_cmp(&b.raw_fitness));
-    let nondom_cnt = solutions.partition_point(|s| s.raw_fitness < 1.0);
+    solutions.sort_unstable_by(|a, b| a.fitness.total_cmp(&b.fitness));
+    let nondom_cnt = solutions.partition_point(|s| s.fitness < 1.0);
     if nondom_cnt > self.archive_size {
+      // NOTE: techincally, if two solutions have equal distances to the k-th
+      //individual, then the tie is broken by considering the second smallest
+      // distances (k-1) and so forth. however, this implementation just uses
+      // the distance to the k-th individual.
       self.assign_densities(solutions);
       // TODO: parallelize
-      solutions.sort_unstable_by(|a, b| {
-        (a.density + a.raw_fitness).total_cmp(&(b.density + b.raw_fitness))
-      });
+      solutions.sort_unstable_by(|a, b| a.fitness.total_cmp(&b.fitness));
     }
     solutions.truncate(self.archive_size);
   }
 
   /// Calculates and assignes density values to solutions' metadata.
   fn assign_densities(&self, solutions: &mut [SolutionData<U>]) {
+    // TODO: only need to calculate densities for nondominated solutions
     // TODO: parallelize
     let mut distances = vec![Vec::<f32>::new(); solutions.len()];
     for (i, a) in solutions[..solutions.len() - 1].iter().enumerate() {
@@ -241,12 +242,11 @@ where
         distances[i + j + 1].push(d);
       }
     }
-
     let k = (solutions.len() as f32).sqrt() as usize;
     // TODO: parallelize
     for (d, s) in distances.iter_mut().zip(solutions.iter_mut()) {
       d.sort_unstable_by(|a, b| a.total_cmp(b));
-      s.density = 1.0 / (d[k] + 2.0);
+      s.fitness += 1.0 / (d[k] + 2.0);
     }
   }
 }
@@ -256,8 +256,7 @@ where
 struct SolutionData<U> {
   solution: U,
   scores: ObjScores,
-  raw_fitness: f32,
-  density: f32,
+  fitness: f32,
 }
 
 impl<U> From<U> for SolutionData<U> {
@@ -265,8 +264,7 @@ impl<U> From<U> for SolutionData<U> {
     SolutionData {
       solution,
       scores: Default::default(),
-      raw_fitness: f32::INFINITY,
-      density: f32::INFINITY,
+      fitness: f32::INFINITY,
     }
   }
 }

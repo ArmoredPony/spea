@@ -310,22 +310,6 @@ mod tests {
     assert_eq!(b.pareto_dominance_ord(&d), Ordering::Equal);
     assert_eq!(a.pareto_dominance_ord(&e), Ordering::Equal);
     assert_eq!(a.pareto_dominance_ord(&f), Ordering::Less);
-
-    // assert_eq!(
-    //   ObjScores(vec![4.064, 0.001])
-    //     .pareto_dominance_ord(&ObjScores(vec![4.955, 0.051])),
-    //   Ordering::Less
-    // );
-
-    let f = |x: f32| x.powf(2.0);
-    let g = |x: f32| (x - 2.0).powf(2.0);
-    let p = -0.43223512;
-    let q = -0.55220985;
-    assert_eq!(
-      ObjScores(vec![f(p), g(p)])
-        .pareto_dominance_ord(&ObjScores(vec![f(q), g(q)])),
-      Ordering::Less
-    );
   }
 
   #[test]

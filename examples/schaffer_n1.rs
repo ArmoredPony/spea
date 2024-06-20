@@ -4,7 +4,7 @@ use rand_distr::Distribution;
 use spea::Spea2;
 
 fn main() {
-  let mut generations = 2000;
+  let mut generations = 1000;
   let terminator = |_: &[&f32]| {
     generations -= 1;
     generations == 0

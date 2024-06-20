@@ -95,17 +95,17 @@ where
       return;
     }
 
-    let mut solutions = std::mem::take(&mut self.population);
-    solutions.iter_mut().for_each(|s| {
+    self.archive.iter_mut().for_each(|s| {
       s.scores = ObjScores(self.objectives.test_each(&s.solution))
     });
-    solutions.append(&mut self.archive);
-    Self::assign_raw_fitness(&mut solutions);
+    self.archive.append(&mut self.population);
+    Self::assign_raw_fitness(&mut self.archive);
 
-    self.perform_enrironmental_selection(&mut solutions);
-    debug_assert_eq!(solutions.len(), self.archive_size);
+    Self::perform_enrironmental_selection(&mut self.archive, self.archive_size);
+    debug_assert_eq!(self.archive.len(), self.archive_size);
 
-    let solution_ptrs: Vec<_> = solutions.iter().map(|s| &s.solution).collect();
+    let solution_ptrs: Vec<_> =
+      self.archive.iter().map(|s| &s.solution).collect();
 
     if self.terminator.terminate(&solution_ptrs) {
       self.finished = true;
@@ -121,7 +121,6 @@ where
       .for_each(|s| self.mutator.mutate(s));
 
     self.population = new_solutions.into_iter().map(Into::into).collect();
-    self.archive = solutions;
   }
 
   pub fn is_finished(&self) -> bool {
@@ -212,26 +211,26 @@ where
   /// there are too few, adds dominated solutions to fill up the archive.
   /// Returns a new archive.
   fn perform_enrironmental_selection(
-    &self,
     solutions: &mut Vec<SolutionData<U>>,
+    archive_size: usize,
   ) {
     // TODO: parallelize
     solutions.sort_unstable_by(|a, b| a.fitness.total_cmp(&b.fitness));
     let nondom_cnt = solutions.partition_point(|s| s.fitness < 1.0);
-    if nondom_cnt > self.archive_size {
+    if nondom_cnt > archive_size {
       // NOTE: techincally, if two solutions have equal distances to the k-th
       //individual, then the tie is broken by considering the second smallest
       // distances (k-1) and so forth. however, this implementation just uses
       // the distance to the k-th individual. performs just as bad but faster
-      self.assign_densities(solutions);
+      Self::assign_densities(solutions);
       // TODO: parallelize
       solutions.sort_unstable_by(|a, b| a.fitness.total_cmp(&b.fitness));
     }
-    solutions.truncate(self.archive_size);
+    solutions.truncate(archive_size);
   }
 
   /// Calculates and assignes density values to solutions' metadata.
-  fn assign_densities(&self, solutions: &mut [SolutionData<U>]) {
+  fn assign_densities(solutions: &mut [SolutionData<U>]) {
     // TODO: only need to calculate densities for nondominated solutions
     // TODO: parallelize
     let mut distances = vec![Vec::<f32>::new(); solutions.len()];

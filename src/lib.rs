@@ -222,7 +222,7 @@ where
       // NOTE: techincally, if two solutions have equal distances to the k-th
       //individual, then the tie is broken by considering the second smallest
       // distances (k-1) and so forth. however, this implementation just uses
-      // the distance to the k-th individual.
+      // the distance to the k-th individual. performs just as bad but faster
       self.assign_densities(solutions);
       // TODO: parallelize
       solutions.sort_unstable_by(|a, b| a.fitness.total_cmp(&b.fitness));

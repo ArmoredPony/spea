@@ -4,13 +4,13 @@ use rand_distr::Distribution;
 use spea::Spea2;
 
 fn main() {
-  let mut generations = 1000;
+  let mut generations = 2000;
   let terminator = |_: &[&f32]| {
     generations -= 1;
     generations == 0
   };
 
-  fn selector<'a>(v: &'a [&'a f32]) -> Vec<&'a f32> {
+  fn selector<'a>(v: &[&'a f32]) -> Vec<&'a f32> {
     v.choose_multiple(&mut rand::thread_rng(), 10)
       .copied()
       .collect()
